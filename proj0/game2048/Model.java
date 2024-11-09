@@ -112,20 +112,10 @@ public class Model extends Observable {
 
         board.setViewingPerspective(side);
 
-        for (int j = 0; j < board.size(); j++) {
-            int[] desiredRows = getDesiredRows(j);
-            for (int i = board.size() - 1; i >= 0; i--) {
-                if (desiredRows[i] != -1 && desiredRows[i] != i) {
-                    if (!changed) {
-                        changed = true;
-                    }
-                    Tile t = board.tile(j, i);
-                    boolean isMerge = board.move(j, desiredRows[i], t);
-                    if (isMerge) {
-                        score += t.value() * 2;
-                    }
-                }
-            }
+        for (int col = 0; col < board.size(); col++) {
+            int[] desiredRows = getDesiredRows(col);
+            boolean colChanged = moveUp(col, desiredRows);
+            changed = changed || colChanged;
         }
 
         checkGameOver();
@@ -137,33 +127,30 @@ public class Model extends Observable {
         return changed;
     }
 
+    /** Get the desired rows for a single column indexed at col.
+     * e.g., tile(col, i) should be moved to (col, desiredRows[i])
+     * */
     private int[] getDesiredRows(int col) {
         int rows = board.size();
         int[] desiredRows = new int[rows];
         int nextPos = rows - 1;
-        for (int i = rows - 1; i >= 0; i--) {
-            Tile t = board.tile(col, i);
-            if (t == null) {
-                desiredRows[i] = -1;
-            } else {
-                desiredRows[i] = nextPos;
-                nextPos--;
-            }
-        }
 
         boolean[] merged = new boolean[rows];
         for (int i = rows - 1; i >= 0; i--) {
             Tile t = board.tile(col, i);
-            if (t != null && !merged[i]) {
+            if (t == null) {
+                desiredRows[i] = i;
+                continue;
+            }
+            if (!merged[i]) {
+                desiredRows[i] = nextPos;
+                nextPos--;
                 for (int j = i - 1; j >= 0; j--) {
                     Tile n = board.tile(col, j);
-                    if (n != null && t.value() == n.value()) {
-                        desiredRows[j] = desiredRows[i];
-                        merged[j] = true;
-                        for (int k = j - 1; k >= 0; k--) {
-                            if (desiredRows[k] != -1) {
-                                desiredRows[k] += 1;
-                            }
+                    if (n != null) {
+                        if (t.value() == n.value()) {
+                            desiredRows[j] = desiredRows[i];
+                            merged[j] = true;
                         }
                         break;
                     }
@@ -171,6 +158,27 @@ public class Model extends Observable {
             }
         }
         return desiredRows;
+    }
+
+    /** Move tiles indexed at col, to desired rows.
+     * e.g., move tile(col, i) to (col, desiredRows[i])
+     * Update changed and score accordingly.
+     * */
+    private boolean moveUp(int col, int[] desiredRows) {
+        boolean changed = false;
+        for (int row = board.size() - 1; row >= 0; row--) {
+            Tile t = board.tile(col, row);
+            if (t != null && desiredRows[row] != row) {
+                if (!changed) {
+                    changed = true;
+                }
+                boolean isMerge = board.move(col, desiredRows[row], t);
+                if (isMerge) {
+                    score += t.value() * 2;
+                }
+            }
+        }
+        return changed;
     }
 
     /** Checks if the game is over and sets the gameOver variable
